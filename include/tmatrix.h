@@ -53,13 +53,51 @@ public:
   // Конструктор конвертации из плотной матрицы
   TCRSMatrix(const vector<vector<T>>& dense)
   {
-    
+      if (dense.empty() || dense[0].empty())
+          throw out_of_range("Matrix dimensions should be between 1 and MAX_MATRIX_SIZE");
+
+      rows = dense.size();
+      cols = dense[0].size();
+
+      if (rows > MAX_MATRIX_SIZE || cols > MAX_MATRIX_SIZE)
+          throw out_of_range("Matrix dimensions should be between 1 and MAX_MATRIX_SIZE");
+
+      row_ptr.assign(rows + 1, 0);
+
+      for (int i = 0;i < rows, i++) {
+          if (dense[i].size() != cols)
+              throw invalid_argument("All columns must be same size");
+
+          for (int j = 0;j < cols, j++) {
+              if (!isZero(dense[i][j])) {
+                  values.push_back(dense[i][j]);
+                  col_index.push_back(j)
+              }
+          }
+          row_ptr[i + 1] = values.size();
+      }
   }
 
   // Конструктор напрямую из массивов CRS
   TCRSMatrix(size_t r, size_t c, const vector<T>& vals, const vector<size_t>& c_idx, const vector<size_t>& r_ptr)
   {
-  
+      if (r == 0 || c == 0)
+          throw out_of_range("Matrix dimensions should be between 1 and MAX_MATRIX_SIZE");
+
+      if (r > MAX_MATRIX_SIZE || c > MAX_MATRIX_SIZE)
+          throw out_of_range("Matrix dimensions should be between 1 and MAX_MATRIX_SIZE");
+
+      if (vals.size() != c_idx.size())
+          throw invalid_argument("Size of values and columns index vector must be same");
+
+      if (r_ptr.size() != r + 1)
+          throw invalid_argument("Row pointer vector must be rows+1 size");
+
+      rows = r;
+      cols = c;
+      values = vals;
+      col_index = c_idx;
+      row_ptr = r_ptr;
   }
 
   TCRSMatrix(const TCRSMatrix& m) = default;
@@ -79,19 +117,51 @@ public:
   // Конвертация обратно в плотную матрицу (для проверки корректности операций)
   vector<vector<T>> toDense() const
   {
-  
+      vector<vector<T>> result(rows,vector<T>(cols, T(0) ));
+
+      for (size_t r_ptr_pointer = 0;r_ptr_pointer < rows;r_ptr_pointer++) {
+          for (size_t values_pointer = 0;values_pointer < r_ptr[r_ptr_pointer + 1];values_pointer++;) {
+              result[r_ptr_pointer][col_index[values_pointer]] = values[values_pointer];
+          }
+      }
+
+      return result;
   }
 
   // Получение элемента по индексам (i, j)
   T at(size_t i, size_t j) const
   {
-  
-    }
+      //i - row | j - column
+      if (i <0 || j<0 || i > rows - 1 || j>cols - 1)
+          throw invalid_argument("Indexes are out of matrix");
+
+      size_t row_start_pointer = r_ptr[i];
+      size_t row_end_pointer = r_ptr[i+1];
+      if (row_start_pointer == row_end_pointer)
+          return T(0);
+
+      for (int i = row_start_pointer; i < row_end_pointer;i++) {
+          if (col_index[i] == j)
+              return values[i];
+          if (col_index[i] > j)
+              return T(0);
+      }
+      return T(0);
+  }
 
   // Сравнение матриц
   bool operator==(const TCRSMatrix& m) const noexcept
   {
-    
+      if (rows != m.getRows() || cols != m.getCols() || values.size() != m.getNNZ())
+          throw invalid_argument("Matrixes must be same size to compare");
+
+      for (int i = 0; i < rows;i++) {
+          for (int j = 0; j < cols;j++) {
+              if (at(i, j) != at(i, j))
+                  return false;
+          }
+      }
+      return true;
   }
   bool operator!=(const TCRSMatrix& m) const noexcept
   {
@@ -101,30 +171,96 @@ public:
   // Транспонирование матрицы (возвращает новую матрицу в формате CRS)
   TCRSMatrix transpose() const
   {
-    
+      TCRSMatrix result(cols, rows);
+
+      size_t nnz = values.size();
+      if (nnz == 0)
+          return result;
+
+      result.values.assign(nnz, T(0));
+      result.col_index.assign(nnz, T(0));
+
+      vector<size_t> col_count(cols, 0);
+      //эл-тов в каждом столбце
+      for (size_t i = 0; i < nnz; i++) {
+          col_count[col_index[i]]++;
+      }
+
+      //row_ptr в новой матрице
+      result.row_ptr[0] = 0;
+      for (size_t i = 0; i < cols; i++) {
+          result.row_ptr[i + 1] = result.row_ptr[i] + col_count[i];
+      }
+
+      //перенос значений
+      vector<size_t> clone_row_ptr = result.row_ptr; // копия, не ссылка
+      for (size_t i = 0; i < rows; ++i) {
+          for (size_t j = row_ptr[i]; j < row_ptr[i + 1]; j++) {
+              size_t place_pos = clone_row_ptr[col_index[j]]++;
+              result.values[place_pos] = values[j];
+              result.col_index[place_pos] = i;
+          }
+      }
+      return result;
   }
 
   // Умножение CRS матрицы на плотный вектор (SpMV)
   vector<T> operator*(const vector<T>& v) const
   {
-    
+      if (v.size() != cols)
+          throw invalid_argument("Vector size must equals to number of columns");
+
+      vector<T> result(rows, T(0));
+      
+      for (size_t i = 0;i < rows;i++) {
+          for (size_t j = row_ptr[i]; j < row_ptr[i + 1]; j++) {
+              result[i] += values[j] * v[col_index[j]];
+          }
+      }
+      return result;
   }
 
   // Умножение двух CRS матриц (SpGEMM) -> результат тоже в формате CRS
   TCRSMatrix operator*(const TCRSMatrix& m) const
   {
-    
+      if (cols != m.getRows())
+          throw invalid_argument("Matrix columns and rows must match for multiplying");
+
+
   }
 
   // Ввод/вывод (в плотном виде или в виде CRS-структуры)
+  // плотный вид выбран
   friend istream& operator>>(istream& istr, TCRSMatrix& m)
   {
-    return istr;
+      size_t i_rows, i_cols;
+      istr >> r >> c;
+
+      vector<vector<T>> dense(i_rows, vector<T>(i_cols));
+
+      for (size_t i = 0; i < i_rows; ++i) {
+          for (size_t j = 0; j < i_cols; ++j) {
+              istr >> dense[i][j];
+          }
+      }
+      m = TCRSMatrix(dense);
+
+      return istr;
   }
 
 friend ostream& operator<<(ostream& ostr, const TCRSMatrix& m)
   {
-    return ostr;
+      ostr << m.rows << " " << m.cols << "\n";
+
+      vector<vector<T>> dense = m.toDense();
+
+      for (size_t i = 0; i < m.rows; ++i) {
+          for (size_t j = 0; j < m.cols; ++j) {
+              ostr << dense[i][j] << " ";
+          }
+          ostr << "\n";
+      }
+      return ostr;
   }
 };
 
