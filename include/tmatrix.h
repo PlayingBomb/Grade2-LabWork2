@@ -64,14 +64,14 @@ public:
 
       row_ptr.assign(rows + 1, 0);
 
-      for (int i = 0;i < rows, i++) {
+      for (size_t i = 0;i < rows; i++) {
           if (dense[i].size() != cols)
               throw invalid_argument("All columns must be same size");
 
-          for (int j = 0;j < cols, j++) {
+          for (size_t j = 0;j < cols; j++) {
               if (!isZero(dense[i][j])) {
                   values.push_back(dense[i][j]);
-                  col_index.push_back(j)
+                  col_index.push_back(j);
               }
           }
           row_ptr[i + 1] = values.size();
@@ -120,7 +120,7 @@ public:
       vector<vector<T>> result(rows,vector<T>(cols, T(0) ));
 
       for (size_t r_ptr_pointer = 0;r_ptr_pointer < rows;r_ptr_pointer++) {
-          for (size_t values_pointer = 0;values_pointer < r_ptr[r_ptr_pointer + 1];values_pointer++;) {
+          for (size_t values_pointer = row_ptr[r_ptr_pointer];values_pointer < row_ptr[r_ptr_pointer + 1];values_pointer++) {
               result[r_ptr_pointer][col_index[values_pointer]] = values[values_pointer];
           }
       }
@@ -135,16 +135,14 @@ public:
       if (i <0 || j<0 || i > rows - 1 || j>cols - 1)
           throw invalid_argument("Indexes are out of matrix");
 
-      size_t row_start_pointer = r_ptr[i];
-      size_t row_end_pointer = r_ptr[i+1];
+      size_t row_start_pointer = row_ptr[i];
+      size_t row_end_pointer = row_ptr[i+1];
       if (row_start_pointer == row_end_pointer)
           return T(0);
 
       for (int i = row_start_pointer; i < row_end_pointer;i++) {
           if (col_index[i] == j)
               return values[i];
-          if (col_index[i] > j)
-              return T(0);
       }
       return T(0);
   }
@@ -157,7 +155,7 @@ public:
 
       for (int i = 0; i < rows;i++) {
           for (int j = 0; j < cols;j++) {
-              if (at(i, j) != at(i, j))
+              if (at(i, j) != m.at(i, j))
                   return false;
           }
       }
@@ -226,7 +224,60 @@ public:
       if (cols != m.getRows())
           throw invalid_argument("Matrix columns and rows must match for multiplying");
 
+      // изначальная A , вторая B, резултат Result
 
+      size_t result_rows = rows;
+      size_t result_cols = m.getCols();
+      //размеров не знаем поэтому задаём все компоненты класса отдельно
+      vector<T> result_values;
+      vector<size_t> result_col_index;
+      vector<size_t> result_row_ptr;
+
+      result_row_ptr.push_back(0);
+
+      vector<T> temp_result_row(result_cols, T(0));
+      vector<bool> temp_col_visited(result_cols, false);
+      vector<size_t> temp_col_index;
+
+      for (size_t i = 0; i < result_rows; i++) {
+          temp_col_index.clear();
+
+          // проход по строке A
+          for (size_t j = row_ptr[i]; j < row_ptr[i + 1]; j++) {
+              T value_a = values[j];
+              size_t col_a = col_index[j];
+
+              // проход по соответствующей столбцу из A строке из B и умножение
+              for (size_t k = m.row_ptr[col_a]; k < m.row_ptr[col_a + 1]; k++) {
+                  T value_b = m.values[k];
+                  size_t col_b = m.col_index[k];
+
+                  if (!temp_col_visited[col_b]) {
+                      temp_col_visited[col_b] = true;
+                      temp_col_index.push_back(col_b);
+                  }
+                  temp_result_row[col_b] += value_a * value_b;
+              }
+          }
+          // сорт сохранённых номеров столбцов чтобы они были по возрастанию при записи
+          sort(temp_col_index.begin(), temp_col_index.end());
+
+
+          // записываем в результат всё что не ноль
+          for (size_t i = 0; i < temp_col_index.size();i++) {
+              size_t col_b_pointer = temp_col_index[i];
+              if (!isZero(temp_result_row[col_b_pointer])) {
+                  result_values.push_back(temp_result_row[col_b_pointer]);
+                  result_col_index.push_back(col_b_pointer);
+              }
+              // убираем из временных переменных то что уже добавили
+              temp_result_row[col_b_pointer] = T(0);
+              temp_col_visited[col_b_pointer] = false;
+          }
+          //след строка результата
+          result_row_ptr.push_back(result_values.size());
+      }
+      return TCRSMatrix(result_rows, result_cols, result_values, result_col_index, result_row_ptr); // собираем результат
   }
 
   // Ввод/вывод (в плотном виде или в виде CRS-структуры)
@@ -256,7 +307,7 @@ friend ostream& operator<<(ostream& ostr, const TCRSMatrix& m)
 
       for (size_t i = 0; i < m.rows; ++i) {
           for (size_t j = 0; j < m.cols; ++j) {
-              ostr << dense[i][j] << " ";
+              ostr << dense[i][j] << "\t";
           }
           ostr << "\n";
       }
