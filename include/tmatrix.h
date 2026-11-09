@@ -150,8 +150,9 @@ public:
   // Сравнение матриц
   bool operator==(const TCRSMatrix& m) const noexcept
   {
-      if (rows != m.getRows() || cols != m.getCols() || values.size() != m.getNNZ())
-          throw invalid_argument("Matrixes must be same size to compare");
+      if (rows != m.getRows() || cols != m.getCols())
+          //throw invalid_argument("Matrixes must be same size to compare");
+          return false;
 
       for (int i = 0; i < rows;i++) {
           for (int j = 0; j < cols;j++) {
@@ -264,8 +265,8 @@ public:
 
 
           // записываем в результат всё что не ноль
-          for (size_t i = 0; i < temp_col_index.size();i++) {
-              size_t col_b_pointer = temp_col_index[i];
+          for (size_t temp_col_pointer = 0; temp_col_pointer < temp_col_index.size();temp_col_pointer++) {
+              size_t col_b_pointer = temp_col_index[temp_col_pointer];
               if (!isZero(temp_result_row[col_b_pointer])) {
                   result_values.push_back(temp_result_row[col_b_pointer]);
                   result_col_index.push_back(col_b_pointer);
