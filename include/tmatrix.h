@@ -93,6 +93,11 @@ public:
       if (r_ptr.size() != r + 1)
           throw invalid_argument("Row pointer vector must be rows+1 size");
 
+      for (size_t i = 0;i < c_idx.size();i++) {
+          if (c_idx[i] + 1 > c)
+              throw out_of_range("Column indexes out of range");
+      }
+
       rows = r;
       cols = c;
       values = vals;
@@ -140,7 +145,7 @@ public:
       if (row_start_pointer == row_end_pointer)
           return T(0);
 
-      for (int i = row_start_pointer; i < row_end_pointer;i++) {
+      for (int k = row_start_pointer; k < row_end_pointer;k++) {
           if (col_index[i] == j)
               return values[i];
       }
@@ -150,17 +155,7 @@ public:
   // Сравнение матриц
   bool operator==(const TCRSMatrix& m) const noexcept
   {
-      if (rows != m.getRows() || cols != m.getCols())
-          //throw invalid_argument("Matrixes must be same size to compare");
-          return false;
-
-      for (int i = 0; i < rows;i++) {
-          for (int j = 0; j < cols;j++) {
-              if (at(i, j) != m.at(i, j))
-                  return false;
-          }
-      }
-      return true;
+      return (rows == m.rows && cols == m.cols && values == m.values && col_index == m.col_index && row_ptr == m.row_ptr);
   }
   bool operator!=(const TCRSMatrix& m) const noexcept
   {
@@ -286,7 +281,7 @@ public:
   friend istream& operator>>(istream& istr, TCRSMatrix& m)
   {
       size_t i_rows, i_cols;
-      istr >> r >> c;
+      istr >> i_rows >> i_cols;
 
       vector<vector<T>> dense(i_rows, vector<T>(i_cols));
 

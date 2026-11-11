@@ -478,6 +478,26 @@ TEST(TCRSMatrix, multiply_matrix_with_empty_rows_works_correctly)
     EXPECT_EQ(res.toDense(), expected_dense);
 }
 
+TEST(TCRSMatrix, can_correctly_create_matrix_from_components)
+{
+    size_t rows = 2;
+    size_t cols = 2;
+    vector<int> values = {2, 3};
+    vector<size_t> c_idx = {0, 1};
+    vector<size_t> r_ptr = {0, 1, 2};
+
+    ASSERT_NO_THROW(TCRSMatrix<int> m(2, 2, values, c_idx, r_ptr));
+
+    ASSERT_ANY_THROW(TCRSMatrix<int> m(2, 2, {2}, c_idx, r_ptr));
+    ASSERT_ANY_THROW(TCRSMatrix<int> m(2, 2, values, {0}, r_ptr));
+
+    ASSERT_ANY_THROW(TCRSMatrix<int> m(2, 2, values, c_idx, {0, 1}));
+
+    ASSERT_ANY_THROW(TCRSMatrix<int> m(0, 2, values, c_idx, r_ptr));
+
+    ASSERT_ANY_THROW(TCRSMatrix<int> m(2, 1, values, c_idx, r_ptr));
+}
+
 //TEST(TDynamicMatrix, cant_subtract_matrixes_with_not_equal_size)
 //{
 //  ADD_FAILURE();
