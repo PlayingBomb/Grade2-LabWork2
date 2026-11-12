@@ -146,8 +146,8 @@ public:
           return T(0);
 
       for (int k = row_start_pointer; k < row_end_pointer;k++) {
-          if (col_index[i] == j)
-              return values[i];
+          if (col_index[k] == j)
+              return values[k];
       }
       return T(0);
   }
