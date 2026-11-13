@@ -109,6 +109,13 @@ public:
               throw out_of_range("Row pointers must be increasing");
       }
 
+      for (size_t i = 0;i < r_ptr.size()-1;i++) {
+          for (size_t j = r_ptr[i]; j+1 < r_ptr[i + 1];j++) {
+              if (c_idx[j] >= c_idx[j + 1])
+                  throw invalid_argument("Column indexes inside one row must increase");
+          }
+      }
+
       rows = r;
       cols = c;
       values = vals;
