@@ -98,6 +98,17 @@ public:
               throw out_of_range("Column indexes out of range");
       }
 
+      if (r_ptr[0] != 0)
+          throw invalid_argument("First row pointer must be 0");
+
+      if (r_ptr[r] != values.size())
+          throw invalid_argument("Last row pointer element must equal amount of values");
+
+      for (size_t i = 0;i < r_ptr.size()-1;i++) {
+          if (r_ptr[i] > r_ptr[i+1])
+              throw out_of_range("Row pointers must be increasing");
+      }
+
       rows = r;
       cols = c;
       values = vals;
